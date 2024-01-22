@@ -1,0 +1,47 @@
+from flask import Flask, request, jsonify
+import random
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
+app = Flask(__name__)
+
+SENDGRID_API_KEY = 'your_sendgrid_api_key'  # Replace with your SendGrid API key
+SENDGRID_EMAIL = 'your_email@example.com'   # Replace with your SendGrid email
+
+otp_storage = {}  # Dictionary to store OTPs temporarily
+
+def send_email(receiver_email, otp):
+    message = Mail(
+        from_email=SENDGRID_EMAIL,
+        to_emails=receiver_email,
+        subject='Your OTP',
+        plain_text_content=f'Your OTP is: {otp}')
+
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        print(response.status_code)
+        print(response.body)
+        print(response.headers)
+    except Exception as e:
+        print(e.message)
+
+@app.route('/request_otp', methods=['POST'])
+def request_otp():
+    email = request.form['email']
+    otp = random.randint(100000, 999999)  # Generate OTP
+    otp_storage[email] = otp  # Store OTP with email as key
+    send_email(email, otp)  # Send OTP via email
+    return jsonify({"message": "OTP sent to your email"})
+
+@app.route('/verify_otp', methods=['POST'])
+def verify_otp():
+    email = request.form['email']
+    otp = request.form['otp']
+    if email in otp_storage and otp_storage[email] == int(otp):
+        return jsonify({"message": "OTP verified", "verified": True})
+    else:
+        return jsonify({"message": "Invalid OTP", "verified": False})
+
+if __name__ == '__main__':
+    app.run(debug=True)
